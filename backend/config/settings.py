@@ -10,7 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -83,13 +85,63 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+# Database configuration
+# Supports local SQLite and Supabase PostgreSQL.
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DJANGO_DB = os.getenv("DJANGO_DB", "sqlite").lower()
+
+if DJANGO_DB == "postgresql":
+
+    required_variables = [
+        "DB_NAME",
+        "DB_USER",
+        "DB_PASSWORD",
+        "DB_HOST",
+    ]
+
+    missing_variables = [
+        name for name in required_variables
+        if not os.getenv(name)
+    ]
+
+    if missing_variables:
+        raise ImproperlyConfigured(
+            "Missing database environment variables: "
+            + ", ".join(missing_variables)
+        )
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["DB_NAME"],
+            "USER": os.environ["DB_USER"],
+            "PASSWORD": os.environ["DB_PASSWORD"],
+            "HOST": os.environ["DB_HOST"],
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": 0,
+            "OPTIONS": {
+                "sslmode": os.getenv(
+                    "DB_SSLMODE", "require"
+                ),
+                "connect_timeout": 10,
+            },
+        }
     }
-}
+
+elif DJANGO_DB == "sqlite":
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
+else:
+    raise ImproperlyConfigured(
+        f"Unsupported DJANGO_DB: {DJANGO_DB}"
+    )
+
 
 
 # Password validation
