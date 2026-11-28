@@ -1,4 +1,6 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import (
     Exercise, PaymentPlan, PersonalRecord,
@@ -11,13 +13,31 @@ from .serializers import (
 )
 
 
-class ProfileViewSet(viewsets.ModelViewSet):
+class ProfileViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = Profile.objects.all()
     serializer_class = ProfileSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def get_queryset(self):
+        return Profile.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        profile = self.get_queryset().first()
+
+        if profile is None:
+            return Response(
+                {'detail': 'User profile not found.'},
+                status=404
+            )
+
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
 
 
 class ExerciseViewSet(viewsets.ModelViewSet):
